@@ -121,7 +121,10 @@ class InMemoryStore {
 
 // Global singleton to persist across Next.js API hot-reloads in development
 const globalForStore = globalThis as unknown as { gymStore?: InMemoryStore };
-export const gymStore = globalForStore.gymStore || new InMemoryStore();
+export const gymStore =
+  globalForStore.gymStore && typeof (globalForStore.gymStore as any).persist === 'function'
+    ? globalForStore.gymStore
+    : new InMemoryStore();
 if (process.env.NODE_ENV !== 'production') {
   globalForStore.gymStore = gymStore;
 }

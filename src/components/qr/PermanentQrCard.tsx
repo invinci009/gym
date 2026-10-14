@@ -152,20 +152,33 @@ export default function PermanentQrCard({
 
             {/* Download & Print Buttons */}
             <div className="flex flex-wrap items-center gap-3 pt-2">
-              <button
-                onClick={handleDownloadPng}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-xs transition-colors shadow-lg shadow-emerald-500/20"
+              <a
+                href={`/api/gym/qr?gymId=${gymId}&format=png&download=true`}
+                download="fit-fiber-gym-wall-qr.png"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-xs transition-colors shadow-lg shadow-emerald-500/20 active:scale-95"
               >
                 <Download className="w-4 h-4" />
-                <span>Download Print-Ready PNG</span>
-              </button>
-              <button
-                onClick={handlePrint}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-semibold text-xs border border-white/10 transition-colors"
+                <span>Download High-Res PNG (1024px)</span>
+              </a>
+
+              <a
+                href={`/api/gym/qr?gymId=${gymId}&format=svg&download=true`}
+                download="fit-fiber-gym-wall-qr.svg"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 font-semibold text-xs border border-emerald-500/30 transition-colors active:scale-95"
               >
-                <Printer className="w-4 h-4" />
-                <span>Print Poster Layout</span>
-              </button>
+                <Download className="w-4 h-4" />
+                <span>Download Vector SVG</span>
+              </a>
+
+              <a
+                href="/admin/qr/poster"
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-semibold text-xs border border-white/10 transition-colors active:scale-95"
+              >
+                <Printer className="w-4 h-4 text-emerald-400" />
+                <span>Print Official Wall Poster (A4 / A3)</span>
+              </a>
             </div>
           </div>
         </div>

@@ -341,49 +341,60 @@ export default function AttendanceActionButton({
         )}
       </div>
 
-      {/* Coordinate Testing / Reviewer Simulator */}
-      <div className="p-3 rounded-xl bg-gray-900/60 border border-white/5 space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-            Reviewer GPS Simulator:
-          </span>
-          <span className="text-[10px] text-gray-500">Allows instant testing of inside vs outside rules</span>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          <button
-            type="button"
-            onClick={() => setSimulationMode('inside')}
-            className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all ${
-              simulationMode === 'inside'
-                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50'
-                : 'bg-black/30 text-gray-400 border-white/5 hover:bg-white/5'
-            }`}
-          >
-            ✓ Inside Gym (0m)
-          </button>
-          <button
-            type="button"
-            onClick={() => setSimulationMode('outside')}
-            className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all ${
-              simulationMode === 'outside'
-                ? 'bg-red-500/20 text-red-400 border-red-500/50'
-                : 'bg-black/30 text-gray-400 border-white/5 hover:bg-white/5'
-            }`}
-          >
-            ✗ Outside (600m away)
-          </button>
-          <button
-            type="button"
-            onClick={() => setSimulationMode('real')}
-            className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all ${
-              simulationMode === 'real'
-                ? 'bg-sky-500/20 text-sky-400 border-sky-500/50'
-                : 'bg-black/30 text-gray-400 border-white/5 hover:bg-white/5'
-            }`}
-          >
-            🛰 Real Device GPS
-          </button>
-        </div>
+      {/* Discreet Location Diagnostics (Collapsible for staff / testing) */}
+      <div className="pt-2 border-t border-white/5">
+        <details className="group">
+          <summary className="text-[11px] text-slate-500 hover:text-slate-300 cursor-pointer flex items-center justify-between py-1 transition-colors select-none">
+            <span className="flex items-center gap-1.5">
+              <Compass className="w-3.5 h-3.5 text-slate-500" />
+              <span>Location Diagnostics &amp; GPS Mode</span>
+            </span>
+            <span className="text-[10px] text-emerald-400 group-open:hidden">
+              {simulationMode === 'real' ? 'Real GPS' : simulationMode === 'inside' ? 'Gym (0m)' : 'Outside'}
+            </span>
+          </summary>
+          <div className="mt-2.5 p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between text-[11px] text-slate-400">
+              <span>GPS Proximity Mode:</span>
+              <span className="text-[10px] text-slate-500">75m Boundary Verification</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setSimulationMode('inside')}
+                className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                  simulationMode === 'inside'
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50'
+                    : 'bg-black/30 text-gray-400 border-white/5 hover:bg-white/5'
+                }`}
+              >
+                Inside Gym (0m)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSimulationMode('outside')}
+                className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                  simulationMode === 'outside'
+                    ? 'bg-red-500/20 text-red-400 border-red-500/50'
+                    : 'bg-black/30 text-gray-400 border-white/5 hover:bg-white/5'
+                }`}
+              >
+                Outside (600m)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSimulationMode('real')}
+                className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                  simulationMode === 'real'
+                    ? 'bg-sky-500/20 text-sky-400 border-sky-500/50'
+                    : 'bg-black/30 text-gray-400 border-white/5 hover:bg-white/5'
+                }`}
+              >
+                Real Device GPS
+              </button>
+            </div>
+          </div>
+        </details>
       </div>
 
       {/* Status Alert Banner */}

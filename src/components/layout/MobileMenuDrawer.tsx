@@ -289,38 +289,14 @@ export default function MobileMenuDrawer({ isOpen, onClose }: MobileMenuDrawerPr
           </div>
         </div>
 
-        {/* Footer Account Switcher & Sign Out */}
+        {/* Footer Sign Out */}
         <div className="pt-4 border-t border-white/10 space-y-2">
-          <div className="text-[10px] text-gray-500 uppercase tracking-wider px-1">
-            Test Accounts:
-          </div>
-          <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-            <button
-              onClick={() => {
-                switchDemoUser('admin@fitgym.com');
-                onClose();
-              }}
-              className="py-1 px-2 rounded-lg bg-gray-900 hover:bg-gray-800 text-amber-300 text-left truncate border border-white/5 cursor-pointer"
-            >
-              Coach Aman (Admin)
-            </button>
-            <button
-              onClick={() => {
-                switchDemoUser('mem-rahul-01');
-                onClose();
-              }}
-              className="py-1 px-2 rounded-lg bg-gray-900 hover:bg-gray-800 text-emerald-300 text-left truncate border border-white/5 cursor-pointer"
-            >
-              Rahul (Active)
-            </button>
-          </div>
-
           <button
             onClick={() => {
               logout();
               onClose();
             }}
-            className="w-full py-2 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer border border-red-500/20 mt-2"
+            className="w-full py-2.5 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer border border-red-500/20 active:scale-95"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span>Sign Out</span>

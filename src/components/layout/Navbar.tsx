@@ -114,76 +114,95 @@ export default function Navbar() {
               </div>
             )}
 
-            {/* Quick Demo Role Switcher (for instant testing of all personas) */}
+            {/* User Profile & Session Controls */}
             <div className="relative">
               <button
                 onClick={() => setSwitchOpen(!switchOpen)}
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-gray-800/80 hover:bg-gray-700 border border-white/10 text-xs text-gray-200 transition-colors"
-                title="Switch test accounts"
+                className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs text-slate-200 transition-all cursor-pointer shadow-sm active:scale-95"
+                title="Account menu"
               >
-                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span className="font-medium truncate max-w-[120px]">
-                  {mounted ? (user?.displayName || 'Select Account') : 'Select Account'}
+                <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-[10px] border border-emerald-500/30">
+                  {mounted && user?.displayName ? user.displayName.slice(0, 2).toUpperCase() : 'FF'}
+                </div>
+                <span className="font-semibold truncate max-w-[120px]">
+                  {mounted ? (user?.displayName || 'My Account') : 'My Account'}
                 </span>
-                <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
 
               {switchOpen && (
-                <div className="absolute right-0 mt-2 w-64 rounded-xl bg-gray-900 border border-white/10 shadow-2xl p-2 z-50">
-                  <div className="px-2 py-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                    Quick Switch Account
+                <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  {/* Account Header */}
+                  <div className="pb-2.5 mb-2 border-b border-slate-800/80">
+                    <div className="text-xs font-bold text-white truncate">{user?.displayName}</div>
+                    <div className="text-[11px] text-slate-400 truncate">{user?.email}</div>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                        isAdmin ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      }`}>
+                        {isAdmin ? 'Staff Admin' : 'Gym Member'}
+                      </span>
+                      {!isAdmin && user && (
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          {user.pointsBalance} pts • {user.currentStreak}d streak
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      switchDemoUser('admin@fitgym.com');
-                      setSwitchOpen(false);
-                    }}
-                    className="w-full text-left px-2.5 py-2 rounded-lg text-xs hover:bg-white/5 flex items-center justify-between text-amber-300"
-                  >
-                    <span>Coach Aman (admin@fitgym.com)</span>
-                    <span className="text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded text-amber-400">Admin</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      switchDemoUser('mem-rahul-01');
-                      setSwitchOpen(false);
-                    }}
-                    className="w-full text-left px-2.5 py-2 rounded-lg text-xs hover:bg-white/5 flex items-center justify-between text-gray-200"
-                  >
-                    <span>Rahul Sharma (Active)</span>
-                    <span className="text-[10px] bg-emerald-500/20 px-1.5 py-0.5 rounded text-emerald-400">Streak: 8</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      switchDemoUser('mem-priya-02');
-                      setSwitchOpen(false);
-                    }}
-                    className="w-full text-left px-2.5 py-2 rounded-lg text-xs hover:bg-white/5 flex items-center justify-between text-gray-200"
-                  >
-                    <span>Priya Singh (29d Streak)</span>
-                    <span className="text-[10px] bg-emerald-500/20 px-1.5 py-0.5 rounded text-emerald-400">Streak: 29</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      switchDemoUser('mem-vikram-03');
-                      setSwitchOpen(false);
-                    }}
-                    className="w-full text-left px-2.5 py-2 rounded-lg text-xs hover:bg-white/5 flex items-center justify-between text-gray-400"
-                  >
-                    <span>Vikram Kumar (Suspended)</span>
-                    <span className="text-[10px] bg-red-500/20 px-1.5 py-0.5 rounded text-red-400">Suspended</span>
-                  </button>
+
+                  {/* Account Switcher Options (for staff/multi-user management) */}
+                  <div className="space-y-1">
+                    <div className="px-1 py-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      Switch User Account
+                    </div>
+                    <button
+                      onClick={() => {
+                        switchDemoUser('admin@fitgym.com');
+                        setSwitchOpen(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl text-xs hover:bg-slate-800 flex items-center justify-between text-amber-300 transition-colors cursor-pointer"
+                    >
+                      <span className="font-medium">Coach Aman (Admin)</span>
+                      <span className="text-[10px] text-amber-400/80">Staff</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        switchDemoUser('mem-rahul-01');
+                        setSwitchOpen(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl text-xs hover:bg-slate-800 flex items-center justify-between text-slate-200 transition-colors cursor-pointer"
+                    >
+                      <span className="font-medium">Rahul Sharma</span>
+                      <span className="text-[10px] text-emerald-400 font-semibold">8d streak</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        switchDemoUser('mem-priya-02');
+                        setSwitchOpen(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl text-xs hover:bg-slate-800 flex items-center justify-between text-slate-200 transition-colors cursor-pointer"
+                    >
+                      <span className="font-medium">Priya Singh</span>
+                      <span className="text-[10px] text-emerald-400 font-semibold">29d streak</span>
+                    </button>
+                  </div>
+
+                  {/* Sign Out */}
+                  <div className="pt-2 mt-2 border-t border-slate-800/80">
+                    <button
+                      onClick={() => {
+                        logout();
+                        setSwitchOpen(false);
+                      }}
+                      className="w-full px-2.5 py-2 rounded-xl text-xs text-rose-400 hover:bg-rose-500/10 flex items-center gap-2 font-semibold transition-colors cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
-
-            <button
-              onClick={logout}
-              className="p-2 text-gray-400 hover:text-red-400 transition-colors rounded-lg hover:bg-white/5"
-              title="Sign Out"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
           </div>
 
           {/* Mobile hamburger button */}
