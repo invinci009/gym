@@ -8,8 +8,6 @@ import {
   RewardRedemption,
   AuditLog,
 } from '../types';
-import fs from 'fs';
-import path from 'path';
 import {
   INITIAL_GYM_SETTINGS,
   INITIAL_MEMBERS,
@@ -30,6 +28,31 @@ export {
   INITIAL_AUDIT_LOGS,
 };
 
+// Safe server-only fs & path access that won't break Turbopack/browser bundles
+function getNodeFs() {
+  if (typeof window === 'undefined') {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      return eval('require')('fs');
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function getNodePath() {
+  if (typeof window === 'undefined') {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      return eval('require')('path');
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 /**
  * In-memory state store with disk persistence fallback (.data/gym-store.json)
  */
@@ -43,17 +66,21 @@ class InMemoryStore {
   redemptions: RewardRedemption[] = [...INITIAL_REDEMPTIONS];
   auditLogs: AuditLog[] = [...INITIAL_AUDIT_LOGS];
 
-  private storageFile: string;
+  private storageFile: string | null = null;
 
   constructor() {
-    this.storageFile = path.resolve(process.cwd(), '.data', 'gym-store.json');
-    this.loadFromDisk();
+    const nodePath = getNodePath();
+    if (nodePath) {
+      this.storageFile = nodePath.resolve(process.cwd(), '.data', 'gym-store.json');
+      this.loadFromDisk();
+    }
   }
 
   loadFromDisk(): void {
     try {
-      if (typeof window === 'undefined' && fs.existsSync(this.storageFile)) {
-        const raw = fs.readFileSync(this.storageFile, 'utf8');
+      const nodeFs = getNodeFs();
+      if (nodeFs && this.storageFile && nodeFs.existsSync(this.storageFile)) {
+        const raw = nodeFs.readFileSync(this.storageFile, 'utf8');
         const data = JSON.parse(raw);
         if (data.settings) this.settings = data.settings;
         if (Array.isArray(data.members)) this.members = data.members;
@@ -70,10 +97,12 @@ class InMemoryStore {
 
   persist(): void {
     try {
-      if (typeof window === 'undefined') {
-        const dir = path.dirname(this.storageFile);
-        if (!fs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true });
+      const nodeFs = getNodeFs();
+      const nodePath = getNodePath();
+      if (nodeFs && nodePath && this.storageFile) {
+        const dir = nodePath.dirname(this.storageFile);
+        if (!nodeFs.existsSync(dir)) {
+          nodeFs.mkdirSync(dir, { recursive: true });
         }
         const data = {
           settings: this.settings,
@@ -84,7 +113,7 @@ class InMemoryStore {
           redemptions: this.redemptions,
           auditLogs: this.auditLogs,
         };
-        fs.writeFileSync(this.storageFile, JSON.stringify(data, null, 2), 'utf8');
+        nodeFs.writeFileSync(this.storageFile, JSON.stringify(data, null, 2), 'utf8');
       }
     } catch {
       // ignore
@@ -119,12 +148,10 @@ class InMemoryStore {
   }
 }
 
-// Global singleton to persist across Next.js API hot-reloads in development
+// Global singleton instance preserved across HMR in Next.js Turbopack dev
 const globalForStore = globalThis as unknown as { gymStore?: InMemoryStore };
+
 export const gymStore =
   globalForStore.gymStore && typeof (globalForStore.gymStore as any).persist === 'function'
     ? globalForStore.gymStore
-    : new InMemoryStore();
-if (process.env.NODE_ENV !== 'production') {
-  globalForStore.gymStore = gymStore;
-}
+    : (globalForStore.gymStore = new InMemoryStore());

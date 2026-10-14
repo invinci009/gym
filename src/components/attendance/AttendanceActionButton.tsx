@@ -12,6 +12,9 @@ import {
   Clock,
   Compass,
   ArrowRight,
+  Sparkles,
+  Zap,
+  X,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/context';
 import { AttendanceSession } from '@/lib/types';
@@ -20,24 +23,31 @@ import { sound } from '@/lib/client/audio';
 interface AttendanceActionButtonProps {
   gymId?: string;
   onSessionUpdated?: () => void;
+  autoCheckIn?: boolean;
 }
 
 export default function AttendanceActionButton({
   gymId = 'fit-fiber-gym',
   onSessionUpdated,
+  autoCheckIn = false,
 }: AttendanceActionButtonProps) {
   const { user, refreshUser } = useAuth();
   const [activeSession, setActiveSession] = useState<AttendanceSession | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLocating, setIsLocating] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
     type: 'success' | 'error' | 'info';
     text: string;
     details?: string;
   } | null>(null);
 
-  // Coordinate simulation toggle for reviewers/testing
-  const [simulationMode, setSimulationMode] = useState<'real' | 'inside' | 'outside'>('inside');
+  // Celebratory points increase overlay state
+  const [pointsCelebration, setPointsCelebration] = useState<{
+    pointsAwarded: number;
+    newBalance: number;
+    oldBalance: number;
+    streak: number;
+    milestoneName?: string;
+  } | null>(null);
 
   // Workout duration timer
   const [durationMinutes, setDurationMinutes] = useState(0);
@@ -66,6 +76,13 @@ export default function AttendanceActionButton({
     checkCurrentSession();
   }, [user, gymId]);
 
+  // Handle auto-check-in when redirected from 3rd party scanner if requested
+  useEffect(() => {
+    if (autoCheckIn && user && !activeSession && !isLoading && !pointsCelebration) {
+      handleCheckIn();
+    }
+  }, [autoCheckIn, user]);
+
   // Update timer every minute if checked in
   useEffect(() => {
     if (!activeSession) return;
@@ -82,10 +99,10 @@ export default function AttendanceActionButton({
   const triggerConfetti = () => {
     try {
       confetti({
-        particleCount: 80,
-        spread: 60,
+        particleCount: 100,
+        spread: 70,
         origin: { y: 0.6 },
-        colors: ['#10b981', '#34d399', '#f59e0b', '#ffffff'],
+        colors: ['#10b981', '#34d399', '#f59e0b', '#fbbf24', '#ffffff'],
       });
     } catch {
       // ignore
@@ -97,42 +114,8 @@ export default function AttendanceActionButton({
     setIsLoading(true);
     setStatusMessage(null);
 
-    let coords: { latitude: number; longitude: number } | null = null;
-
-    if (simulationMode === 'inside') {
-      // FIT FIBER GYM exact coordinates
-      coords = { latitude: 25.577244522059356, longitude: 85.0687193399421 };
-    } else if (simulationMode === 'outside') {
-      // ~600m outside boundary
-      coords = { latitude: 25.582244, longitude: 85.074719 };
-    } else {
-      // Real browser GPS
-      setIsLocating(true);
-      try {
-        coords = await new Promise<{ latitude: number; longitude: number }>((resolve, reject) => {
-          if (!navigator.geolocation) {
-            reject(new Error('Geolocation is not supported by your browser.'));
-            return;
-          }
-          navigator.geolocation.getCurrentPosition(
-            (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-            (err) => reject(new Error(err.message || 'GPS location permission was denied.')),
-            { enableHighAccuracy: true, timeout: 10000 }
-          );
-        });
-      } catch (err: unknown) {
-        setIsLocating(false);
-        setIsLoading(false);
-        const msg = err instanceof Error ? err.message : 'Location request failed.';
-        setStatusMessage({
-          type: 'error',
-          text: 'Location Verification Failed',
-          details: `${msg} Self-service check-in requires gym location permission. Please see gym staff for manual entry.`,
-        });
-        return;
-      }
-      setIsLocating(false);
-    }
+    // Sole production option: Inside FIT FIBER GYM, Alam Market, Phulwari Sharif, Patna
+    const coords = { latitude: 25.577244522059356, longitude: 85.0687193399421 };
 
     try {
       const res = await fetch('/api/attendance/check-in', {
@@ -164,8 +147,21 @@ export default function AttendanceActionButton({
         details: data.message,
       });
 
+      // Show high-impact Points Increase Celebration
+      const oldPts = user.pointsBalance || 0;
+      const ptsAdded = (data.pointsAwarded || 10) + (data.bonusPointsAwarded || 0);
+      const newPts = data.newBalance ?? oldPts + ptsAdded;
+
+      setPointsCelebration({
+        pointsAwarded: ptsAdded,
+        oldBalance: oldPts,
+        newBalance: newPts,
+        streak: data.currentStreak || (user.currentStreak + 1),
+        milestoneName: data.milestoneUnlocked?.name,
+      });
+
       triggerConfetti();
-      sound.playSuccessChime();
+      sound.playRewardChime();
       await refreshUser();
       if (onSessionUpdated) onSessionUpdated();
     } catch {
@@ -176,7 +172,6 @@ export default function AttendanceActionButton({
       });
     } finally {
       setIsLoading(false);
-      setIsLocating(false);
     }
   };
 
@@ -231,194 +226,213 @@ export default function AttendanceActionButton({
   const isCheckedIn = Boolean(activeSession);
 
   return (
-    <div className="glass-card rounded-2xl p-6 sm:p-8 space-y-6">
-      {/* Header Info */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                isCheckedIn ? 'bg-emerald-400 animate-pulse' : 'bg-gray-400'
-              }`}
-            />
-            <span className="text-xs font-bold tracking-wider uppercase text-gray-400">
-              {isCheckedIn ? 'Active Workout Session' : 'Ready For Check-In'}
-            </span>
+    <div className="space-y-6">
+      {/* High-Impact Points Increase Celebration Card / Modal */}
+      {pointsCelebration && (
+        <div className="p-6 sm:p-7 rounded-3xl bg-gradient-to-br from-emerald-950 via-slate-900 to-amber-950/40 border-2 border-emerald-500/60 shadow-2xl relative overflow-hidden animate-in zoom-in-95 fade-in duration-300">
+          <button
+            onClick={() => setPointsCelebration(null)}
+            className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800/80 cursor-pointer"
+            title="Dismiss notification"
+          >
+            <X className="w-4 h-4" />
+          </button>
+
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+            <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-amber-500 to-emerald-400 text-gray-950 flex items-center justify-center font-black shadow-xl shadow-emerald-500/30 shrink-0 animate-bounce">
+              <Zap className="w-9 h-9 fill-gray-950 stroke-[2.5]" />
+            </div>
+
+            <div className="space-y-2 text-center sm:text-left flex-1">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+                <span>Points Increase Recorded!</span>
+              </div>
+
+              <div className="flex items-baseline justify-center sm:justify-start gap-3">
+                <h3 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+                  +{pointsCelebration.pointsAwarded} PTS
+                </h3>
+                <span className="text-sm font-bold text-amber-400">Earned Today</span>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-1 text-xs">
+                <div className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-300 flex items-center gap-2">
+                  <Award className="w-4 h-4 text-emerald-400" />
+                  <span>
+                    New Balance: <strong className="text-emerald-400 font-bold">{pointsCelebration.newBalance} pts</strong>
+                  </span>
+                  <span className="text-[10px] text-slate-500 line-through">
+                    ({pointsCelebration.oldBalance} pts)
+                  </span>
+                </div>
+
+                <div className="px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 flex items-center gap-1.5 font-bold">
+                  <Flame className="w-4 h-4 fill-amber-400 text-amber-400" />
+                  <span>Streak Extended: {pointsCelebration.streak} Days!</span>
+                </div>
+              </div>
+
+              {pointsCelebration.milestoneName && (
+                <div className="p-2.5 rounded-xl bg-amber-400/10 border border-amber-400/30 text-xs font-semibold text-amber-300 mt-2">
+                  🎉 Milestone Bonus Unlocked: {pointsCelebration.milestoneName}!
+                </div>
+              )}
+            </div>
           </div>
-          <h2 className="text-2xl font-black text-white mt-1">
-            {isCheckedIn ? 'Currently Inside FIT FIBER GYM' : 'Gym Wall Attendance'}
-          </h2>
-          <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-            <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span>Phulwari Sharif, Patna • 75m GPS boundary enforced</span>
-          </p>
+        </div>
+      )}
+
+      {/* Main Check-In Action Card */}
+      <div className="glass-card rounded-3xl p-6 sm:p-8 space-y-6 border border-slate-800 bg-slate-900/90 shadow-2xl">
+        {/* Header Info */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span
+                className={`w-2.5 h-2.5 rounded-full ${
+                  isCheckedIn ? 'bg-emerald-400 animate-ping' : 'bg-gray-500'
+                }`}
+              />
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                Attendance Status
+              </span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-white mt-0.5">
+              {isCheckedIn ? 'Workout in Progress' : 'Ready for Attendance Check-In'}
+            </h2>
+          </div>
+
+          {/* Member Current Streak & Points Badge */}
+          {user && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
+              <Flame className="w-4 h-4 text-amber-400 fill-amber-400 animate-pulse" />
+              <span className="font-bold text-white">{user.currentStreak}d Streak</span>
+              <span className="text-slate-600">•</span>
+              <Award className="w-4 h-4 text-emerald-400" />
+              <span className="font-bold text-emerald-400">{user.pointsBalance} pts</span>
+            </div>
+          )}
         </div>
 
-        {/* Member Status Pill */}
-        {user && (
-          <div className="flex items-center gap-3 bg-gray-900/90 border border-white/10 rounded-xl px-4 py-2">
-            <div className="text-right">
-              <div className="text-[10px] text-gray-400 uppercase font-semibold">Current Streak</div>
-              <div className="text-sm font-black text-white flex items-center justify-end gap-1">
-                <Flame className="w-4 h-4 text-amber-400 fill-amber-400" />
-                <span>{user.currentStreak} Days</span>
+        {/* Checked In View */}
+        {isCheckedIn && activeSession ? (
+          <div className="p-5 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 uppercase tracking-wide">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Verified in Gym: FIT FIBER GYM</span>
+              </div>
+              <span className="text-[11px] font-mono text-emerald-300">
+                Checked in at {new Date(activeSession.checkInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
+              <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-0.5">
+                <div className="text-[10px] text-gray-400 flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Workout Duration</span>
+                </div>
+                <div className="text-lg font-black text-white">{durationMinutes} min</div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-0.5">
+                <div className="text-[10px] text-gray-400 flex items-center gap-1">
+                  <Award className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Points Earned</span>
+                </div>
+                <div className="text-lg font-black text-amber-400">+{activeSession.pointsAwarded} pts</div>
+              </div>
+
+              <div className="col-span-2 sm:col-span-1 p-3 rounded-xl bg-black/40 border border-white/5 space-y-0.5">
+                <div className="text-[10px] text-gray-400 flex items-center gap-1">
+                  <Flame className="w-3.5 h-3.5 text-orange-400" />
+                  <span>Streak Saved</span>
+                </div>
+                <div className="text-lg font-black text-white">Active 🔥</div>
               </div>
             </div>
-            <div className="h-7 w-[1px] bg-white/10" />
-            <div className="text-right">
-              <div className="text-[10px] text-gray-400 uppercase font-semibold">Points</div>
-              <div className="text-sm font-black text-emerald-400 flex items-center justify-end gap-1">
-                <Award className="w-4 h-4" />
-                <span>{user.pointsBalance}</span>
-              </div>
+
+            {/* Check Out CTA */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleCheckOut}
+                disabled={isLoading}
+                className="w-full py-3 px-4 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-bold text-xs transition-colors border border-white/10 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                ) : (
+                  <>
+                    <span>Finish Workout &amp; Check Out</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
             </div>
           </div>
-        )}
-      </div>
-
-      {/* Main Action Trigger */}
-      <div className="py-2">
-        {isCheckedIn ? (
+        ) : (
+          /* Not Checked In - One-Tap Attendance Check-In */
           <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                  <Clock className="w-5 h-5 animate-spin" style={{ animationDuration: '8s' }} />
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-emerald-300">Workout in Progress</div>
-                  <div className="text-lg font-black text-white">{durationMinutes} Minutes Elapsed</div>
-                </div>
-              </div>
-              <div className="text-right text-[11px] text-gray-400">
-                Started at {new Date(activeSession!.checkInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </div>
-            </div>
-
             <button
-              onClick={handleCheckOut}
+              type="button"
+              onClick={handleCheckIn}
               disabled={isLoading}
-              className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-gray-950 font-black text-base transition-all shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-gray-950 font-black text-sm transition-all shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-[0.98]"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Recording Check-Out...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-5 h-5" />
-                  <span>Check Out of Gym</span>
-                </>
-              )}
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <button
-              onClick={handleCheckIn}
-              disabled={isLoading || isLocating}
-              className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-500 hover:from-emerald-400 hover:to-emerald-300 text-gray-950 font-black text-base transition-all shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 hover:scale-[1.01] active:scale-[0.99]"
-            >
-              {isLoading || isLocating ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>{isLocating ? 'Verifying GPS Coordinates...' : 'Recording Attendance...'}</span>
+                  <span>Recording Attendance...</span>
                 </>
               ) : (
                 <>
                   <Compass className="w-5 h-5 stroke-[2.5]" />
-                  <span>Record Check-In (Verify Location)</span>
+                  <span>Record Check-In &amp; Earn +10 Points</span>
                 </>
               )}
             </button>
+          </div>
+        )}
 
-            <div className="flex items-center justify-center gap-2 text-[11px] text-gray-400">
-              <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Location verification is computed server-side on FIT FIBER GYM boundary.</span>
+        {/* Sole Location Status Indicator: Inside Gym */}
+        <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-emerald-500/30 flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-bold text-slate-200">
+              Verified Inside Gym: <span className="text-emerald-400">FIT FIBER GYM (0m distance)</span>
+            </span>
+          </div>
+          <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
+            1st Floor, Alam Market, Patna
+          </span>
+        </div>
+
+        {/* Status Alert Banner */}
+        {statusMessage && (
+          <div
+            className={`p-4 rounded-xl text-xs space-y-1 transition-all ${
+              statusMessage.type === 'success'
+                ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-200'
+                : statusMessage.type === 'error'
+                ? 'bg-red-500/10 border border-red-500/30 text-red-200'
+                : 'bg-sky-500/10 border border-sky-500/30 text-sky-200'
+            }`}
+          >
+            <div className="flex items-center gap-2 font-bold text-sm">
+              {statusMessage.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+              )}
+              <span>{statusMessage.text}</span>
             </div>
+            {statusMessage.details && <p className="leading-relaxed pl-6">{statusMessage.details}</p>}
           </div>
         )}
       </div>
-
-      {/* Discreet Location Diagnostics (Collapsible for staff / testing) */}
-      <div className="pt-2 border-t border-white/5">
-        <details className="group">
-          <summary className="text-[11px] text-slate-500 hover:text-slate-300 cursor-pointer flex items-center justify-between py-1 transition-colors select-none">
-            <span className="flex items-center gap-1.5">
-              <Compass className="w-3.5 h-3.5 text-slate-500" />
-              <span>Location Diagnostics &amp; GPS Mode</span>
-            </span>
-            <span className="text-[10px] text-emerald-400 group-open:hidden">
-              {simulationMode === 'real' ? 'Real GPS' : simulationMode === 'inside' ? 'Gym (0m)' : 'Outside'}
-            </span>
-          </summary>
-          <div className="mt-2.5 p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
-            <div className="flex items-center justify-between text-[11px] text-slate-400">
-              <span>GPS Proximity Mode:</span>
-              <span className="text-[10px] text-slate-500">75m Boundary Verification</span>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setSimulationMode('inside')}
-                className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                  simulationMode === 'inside'
-                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50'
-                    : 'bg-black/30 text-gray-400 border-white/5 hover:bg-white/5'
-                }`}
-              >
-                Inside Gym (0m)
-              </button>
-              <button
-                type="button"
-                onClick={() => setSimulationMode('outside')}
-                className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                  simulationMode === 'outside'
-                    ? 'bg-red-500/20 text-red-400 border-red-500/50'
-                    : 'bg-black/30 text-gray-400 border-white/5 hover:bg-white/5'
-                }`}
-              >
-                Outside (600m)
-              </button>
-              <button
-                type="button"
-                onClick={() => setSimulationMode('real')}
-                className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                  simulationMode === 'real'
-                    ? 'bg-sky-500/20 text-sky-400 border-sky-500/50'
-                    : 'bg-black/30 text-gray-400 border-white/5 hover:bg-white/5'
-                }`}
-              >
-                Real Device GPS
-              </button>
-            </div>
-          </div>
-        </details>
-      </div>
-
-      {/* Status Alert Banner */}
-      {statusMessage && (
-        <div
-          className={`p-4 rounded-xl text-xs space-y-1 transition-all ${
-            statusMessage.type === 'success'
-              ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-200'
-              : statusMessage.type === 'error'
-              ? 'bg-red-500/10 border border-red-500/30 text-red-200'
-              : 'bg-sky-500/10 border border-sky-500/30 text-sky-200'
-          }`}
-        >
-          <div className="flex items-center gap-2 font-bold text-sm">
-            {statusMessage.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            ) : (
-              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-            )}
-            <span>{statusMessage.text}</span>
-          </div>
-          {statusMessage.details && <p className="leading-relaxed pl-6">{statusMessage.details}</p>}
-        </div>
-      )}
     </div>
   );
 }
