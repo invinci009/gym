@@ -25,6 +25,11 @@ export default function Navbar() {
   const { user, role, logout, switchDemoUser } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const isAdmin = role === 'admin';
 
@@ -97,7 +102,7 @@ export default function Navbar() {
 
           {/* User Status / Quick Switcher */}
           <div className="hidden sm:flex items-center gap-3">
-            {!isAdmin && user && (
+            {mounted && !isAdmin && user && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-500/20 text-xs">
                 <Flame className="w-4 h-4 text-amber-400 fill-amber-400 animate-pulse" />
                 <span className="font-bold text-white">{user.currentStreak} Day Streak</span>
@@ -115,7 +120,9 @@ export default function Navbar() {
                 title="Switch test accounts"
               >
                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span className="font-medium truncate max-w-[120px]">{user?.displayName || 'Select Account'}</span>
+                <span className="font-medium truncate max-w-[120px]">
+                  {mounted ? (user?.displayName || 'Select Account') : 'Select Account'}
+                </span>
                 <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
               </button>
 
@@ -211,7 +218,7 @@ export default function Navbar() {
           })}
           <div className="pt-3 border-t border-white/10 flex items-center justify-between">
             <div className="text-xs text-gray-400">
-              Signed in as <span className="font-semibold text-white">{user?.displayName}</span> ({user?.role})
+              Signed in as <span className="font-semibold text-white">{mounted ? user?.displayName : ''}</span> {mounted && user?.role ? `(${user.role})` : ''}
             </div>
             <button onClick={logout} className="text-xs text-red-400 hover:underline">
               Sign Out
