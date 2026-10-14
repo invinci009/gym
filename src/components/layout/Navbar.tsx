@@ -35,6 +35,11 @@ export default function Navbar() {
 
   const isAdmin = role === 'admin';
 
+  // Standalone pages (like qr~zaika's /r/[slug] customer landing or print poster)
+  if (pathname.startsWith('/check-in') || pathname === '/admin/qr/poster') {
+    return null;
+  }
+
   const memberLinks = [
     { href: '/dashboard', label: 'Dashboard', icon: Dumbbell },
     { href: '/check-in/fit-fiber-gym', label: 'Check In / Out', icon: QrCode },
