@@ -11,6 +11,8 @@ import {
   X,
   Check,
   Loader2,
+  Search,
+  Filter,
 } from 'lucide-react';
 import { Reward, RewardRedemption } from '@/lib/types';
 import { useAuth } from '@/lib/auth/context';
@@ -21,6 +23,8 @@ export default function AdminRewardsPage() {
   const [redemptions, setRedemptions] = useState<RewardRedemption[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'claims' | 'rewards'>('claims');
+  const [claimSearch, setClaimSearch] = useState('');
+  const [claimStatusFilter, setClaimStatusFilter] = useState<'all' | 'pending' | 'fulfilled'>('all');
 
   // New reward form
   const [name, setName] = useState('');
@@ -162,74 +166,130 @@ export default function AdminRewardsPage() {
 
       {/* Tab 1: Claims Queue */}
       {activeTab === 'claims' && (
-        <div className="glass-card rounded-2xl overflow-hidden border border-white/10">
-          <div className="p-4 border-b border-white/10 flex items-center justify-between">
+        <div className="glass-card rounded-2xl overflow-hidden border border-white/10 space-y-4">
+          <div className="p-4 sm:p-5 border-b border-white/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-bold text-white">Member Redemption Claims</h3>
-              <p className="text-xs text-gray-400">Verify member identity before marking as fulfilled</p>
+              <p className="text-xs text-gray-400">Verify member identity or voucher code before marking as fulfilled</p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
+                <input
+                  type="text"
+                  value={claimSearch}
+                  onChange={(e) => setClaimSearch(e.target.value)}
+                  placeholder="Search member, reward or code..."
+                  className="bg-gray-950 border border-white/10 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 w-52"
+                />
+              </div>
+
+              <div className="flex items-center gap-1 bg-gray-950 p-1 rounded-xl border border-white/10 text-xs">
+                {(['all', 'pending', 'fulfilled'] as const).map((st) => (
+                  <button
+                    key={st}
+                    onClick={() => setClaimStatusFilter(st)}
+                    className={`px-2.5 py-1 rounded-lg font-semibold capitalize transition-colors ${
+                      claimStatusFilter === st
+                        ? 'bg-emerald-500 text-gray-950 shadow-sm'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          {redemptions.length === 0 ? (
-            <div className="p-8 text-center text-xs text-gray-400">No member redemptions yet.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-950/60 text-gray-400 uppercase tracking-wider font-semibold border-b border-white/5">
-                  <tr>
-                    <th className="py-3 px-4">Claim Date</th>
-                    <th className="py-3 px-4">Member</th>
-                    <th className="py-3 px-4">Reward Item</th>
-                    <th className="py-3 px-4">Points Spent</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4 text-right">Fulfillment Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5 text-gray-300">
-                  {redemptions.map((red) => (
-                    <tr key={red.id} className="hover:bg-white/5 transition-colors">
-                      <td className="py-3.5 px-4 whitespace-nowrap text-gray-400">
-                        {new Date(red.createdAt).toLocaleDateString()}{' '}
-                        {new Date(red.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <div className="font-bold text-white">{red.memberName}</div>
-                        <div className="text-[10px] text-gray-500">{red.memberEmail}</div>
-                      </td>
-                      <td className="py-3.5 px-4 font-semibold text-white">{red.rewardName}</td>
-                      <td className="py-3.5 px-4 whitespace-nowrap font-bold text-amber-400">
-                        -{red.pointsSpent} pts
-                      </td>
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        {red.status === 'fulfilled' ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                            Fulfilled
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                            Pending Handover
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        {red.status === 'pending' ? (
-                          <button
-                            onClick={() => handleFulfillRedemption(red.id)}
-                            className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-xs transition-colors inline-flex items-center gap-1 shadow-sm"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Mark Fulfilled</span>
-                          </button>
-                        ) : (
-                          <span className="text-[11px] text-gray-500">Fulfilled by {red.fulfilledBy}</span>
-                        )}
-                      </td>
+          {(() => {
+            const filtered = redemptions.filter((red) => {
+              if (claimStatusFilter !== 'all' && red.status !== claimStatusFilter) return false;
+              if (claimSearch) {
+                const q = claimSearch.toLowerCase();
+                const vCode = `FFG-${red.id.toUpperCase()}`.toLowerCase();
+                return (
+                  red.memberName.toLowerCase().includes(q) ||
+                  red.memberEmail.toLowerCase().includes(q) ||
+                  red.rewardName.toLowerCase().includes(q) ||
+                  vCode.includes(q)
+                );
+              }
+              return true;
+            });
+
+            if (filtered.length === 0) {
+              return (
+                <div className="p-8 text-center text-xs text-gray-400">
+                  No redemptions matching filter.
+                </div>
+              );
+            }
+
+            return (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-gray-950/60 text-gray-400 uppercase tracking-wider font-semibold border-b border-white/5">
+                    <tr>
+                      <th className="py-3 px-4">Claim Date</th>
+                      <th className="py-3 px-4">Voucher Code</th>
+                      <th className="py-3 px-4">Member</th>
+                      <th className="py-3 px-4">Reward Item</th>
+                      <th className="py-3 px-4">Points Spent</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4 text-right">Fulfillment Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody className="divide-y divide-white/5 text-gray-300">
+                    {filtered.map((red) => (
+                      <tr key={red.id} className="hover:bg-white/5 transition-colors">
+                        <td className="py-3.5 px-4 whitespace-nowrap text-gray-400">
+                          {new Date(red.createdAt).toLocaleDateString()}{' '}
+                          {new Date(red.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="py-3.5 px-4 whitespace-nowrap font-mono font-bold text-emerald-400">
+                          FFG-{red.id.toUpperCase()}
+                        </td>
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <div className="font-bold text-white">{red.memberName}</div>
+                          <div className="text-[10px] text-gray-500">{red.memberEmail}</div>
+                        </td>
+                        <td className="py-3.5 px-4 font-semibold text-white">{red.rewardName}</td>
+                        <td className="py-3.5 px-4 whitespace-nowrap font-bold text-amber-400">
+                          -{red.pointsSpent} pts
+                        </td>
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          {red.status === 'fulfilled' ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                              Fulfilled
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                              Pending Handover
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          {red.status === 'pending' ? (
+                            <button
+                              onClick={() => handleFulfillRedemption(red.id)}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-xs transition-colors inline-flex items-center gap-1 shadow-sm cursor-pointer"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Mark Fulfilled</span>
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-gray-500">Fulfilled by {red.fulfilledBy}</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
         </div>
       )}
 

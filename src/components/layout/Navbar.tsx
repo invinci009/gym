@@ -19,11 +19,13 @@ import {
   Gift,
   ChevronDown,
 } from 'lucide-react';
+import MobileBottomNav from './MobileBottomNav';
+import MobileMenuDrawer from './MobileMenuDrawer';
 
 export default function Navbar() {
   const pathname = usePathname();
   const { user, role, logout, switchDemoUser } = useAuth();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -133,12 +135,12 @@ export default function Navbar() {
                   </div>
                   <button
                     onClick={() => {
-                      switchDemoUser('admin-aman-00');
+                      switchDemoUser('admin@fitgym.com');
                       setSwitchOpen(false);
                     }}
                     className="w-full text-left px-2.5 py-2 rounded-lg text-xs hover:bg-white/5 flex items-center justify-between text-amber-300"
                   >
-                    <span>Coach Aman (Admin)</span>
+                    <span>Coach Aman (admin@fitgym.com)</span>
                     <span className="text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded text-amber-400">Admin</span>
                   </button>
                   <button
@@ -184,48 +186,24 @@ export default function Navbar() {
             </button>
           </div>
 
-          {/* Mobile hamburger */}
+          {/* Mobile hamburger button */}
           <div className="flex md:hidden items-center gap-2">
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg bg-gray-800 text-gray-300 hover:text-white"
+              onClick={() => setDrawerOpen(true)}
+              className="p-2 rounded-xl bg-gray-800 text-gray-300 hover:text-white cursor-pointer"
+              title="Open Navigation Menu"
             >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              <Menu className="w-5 h-5" />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Mobile Menu */}
-      {mobileMenuOpen && (
-        <div className="md:hidden border-t border-white/10 bg-[#0d131f] px-4 pt-3 pb-5 space-y-2">
-          {links.map((link) => {
-            const Icon = link.icon;
-            const isActive = pathname === link.href;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium ${
-                  isActive ? 'bg-emerald-500/15 text-emerald-400' : 'text-gray-300 hover:bg-white/5'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                <span>{link.label}</span>
-              </Link>
-            );
-          })}
-          <div className="pt-3 border-t border-white/10 flex items-center justify-between">
-            <div className="text-xs text-gray-400">
-              Signed in as <span className="font-semibold text-white">{mounted ? user?.displayName : ''}</span> {mounted && user?.role ? `(${user.role})` : ''}
-            </div>
-            <button onClick={logout} className="text-xs text-red-400 hover:underline">
-              Sign Out
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Mobile Slideout Drawer */}
+      <MobileMenuDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
+      {/* Mobile Bottom Navigation Bar */}
+      <MobileBottomNav onOpenDrawer={() => setDrawerOpen(true)} />
     </header>
   );
 }

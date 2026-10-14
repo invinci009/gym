@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/context';
 import { AttendanceSession } from '@/lib/types';
+import { sound } from '@/lib/client/audio';
 
 interface AttendanceActionButtonProps {
   gymId?: string;
@@ -164,6 +165,7 @@ export default function AttendanceActionButton({
       });
 
       triggerConfetti();
+      sound.playSuccessChime();
       await refreshUser();
       if (onSessionUpdated) onSessionUpdated();
     } catch {
@@ -206,6 +208,7 @@ export default function AttendanceActionButton({
       }
 
       setActiveSession(null);
+      sound.playCheckOutTone();
       setStatusMessage({
         type: 'success',
         text: 'Checked Out Successfully!',

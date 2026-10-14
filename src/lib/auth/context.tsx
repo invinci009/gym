@@ -2,7 +2,15 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { GymMember, UserRole } from '../types';
-import { INITIAL_MEMBERS } from '../mock/store';
+import { auth, isFirebaseConfigured } from '../firebase/client';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  updateProfile,
+} from 'firebase/auth';
+import { INITIAL_MEMBERS } from '../mock/data';
 
 interface AuthContextType {
   user: GymMember | null;
@@ -16,7 +24,7 @@ interface AuthContextType {
     phone?: string;
     password?: string;
   }) => Promise<{ success: boolean; message?: string }>;
-  logout: () => void;
+  logout: () => Promise<void>;
   switchDemoUser: (uidOrEmail: string) => void;
   refreshUser: () => Promise<void>;
 }
@@ -27,9 +35,89 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<GymMember | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize with persisted session or default active member
+  // Sync with Firebase Authentication & local state
   useEffect(() => {
-    try {
+    let unsubscribe = () => {};
+
+    if (auth && isFirebaseConfigured) {
+      unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (firebaseUser) {
+          try {
+            // Fetch member details from backend
+            const res = await fetch(`/api/attendance/scan`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ gymId: 'fit-fiber-gym', memberId: firebaseUser.uid }),
+            });
+            const data = await res.json();
+
+            const role: UserRole =
+              firebaseUser.email?.toLowerCase().includes('admin') ||
+              firebaseUser.email === 'admin@fitgym.com'
+                ? 'admin'
+                : 'member';
+
+            if (data.member) {
+              setUser({
+                ...data.member,
+                displayName: firebaseUser.displayName || data.member.displayName || 'Gym Member',
+                email: firebaseUser.email || data.member.email,
+                role,
+              });
+            } else {
+              // Create member representation
+              const newMember: GymMember = {
+                uid: firebaseUser.uid,
+                gymId: 'fit-fiber-gym',
+                displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Member',
+                email: firebaseUser.email || '',
+                role,
+                membershipStatus: 'active',
+                currentStreak: 0,
+                longestStreak: 0,
+                totalQualifyingDays: 0,
+                totalVisits: 0,
+                pointsBalance: 0,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              };
+              setUser(newMember);
+            }
+          } catch {
+            // Fallback
+            setUser({
+              uid: firebaseUser.uid,
+              gymId: 'fit-fiber-gym',
+              displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Member',
+              email: firebaseUser.email || '',
+              role: firebaseUser.email?.includes('admin') ? 'admin' : 'member',
+              membershipStatus: 'active',
+              currentStreak: 0,
+              longestStreak: 0,
+              totalQualifyingDays: 0,
+              totalVisits: 0,
+              pointsBalance: 0,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        } else {
+          // Check local stored session for seamless sandbox usage
+          const storedUid = typeof window !== 'undefined' ? localStorage.getItem('fitfiber_active_user') : null;
+          if (storedUid) {
+            const found = INITIAL_MEMBERS.find((m) => m.uid === storedUid || m.email === storedUid);
+            if (found) {
+              setUser(found);
+              setIsLoading(false);
+              return;
+            }
+          }
+          // Default to Rahul Sharma (Active Member)
+          setUser(INITIAL_MEMBERS[0]);
+        }
+        setIsLoading(false);
+      });
+    } else {
       const storedUid = typeof window !== 'undefined' ? localStorage.getItem('fitfiber_active_user') : null;
       if (storedUid) {
         const found = INITIAL_MEMBERS.find((m) => m.uid === storedUid || m.email === storedUid);
@@ -39,31 +127,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
       }
-      // Default to Rahul Sharma (Active Member) for easy preview
       setUser(INITIAL_MEMBERS[0]);
-    } catch {
-      setUser(INITIAL_MEMBERS[0]);
-    } finally {
       setIsLoading(false);
     }
+
+    return () => unsubscribe();
   }, []);
 
-  const login = async (email: string): Promise<{ success: boolean; message?: string }> => {
+  const login = async (email: string, password?: string): Promise<{ success: boolean; message?: string }> => {
     setIsLoading(true);
     try {
-      // Find matching user from mock store / server
-      const res = await fetch(`/api/attendance/scan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gymId: 'fit-fiber-gym', memberId: email }),
-      });
-      const data = await res.json();
+      // 1. Attempt real Firebase Auth if configured and password provided
+      if (auth && password && isFirebaseConfigured) {
+        try {
+          const userCredential = await signInWithEmailAndPassword(auth, email, password);
+          const fbUser = userCredential.user;
+          const role: UserRole =
+            email.toLowerCase().includes('admin') || email === 'admin@fitgym.com' ? 'admin' : 'member';
 
-      let targetUser = INITIAL_MEMBERS.find((m) => m.email.toLowerCase() === email.toLowerCase());
-      if (!targetUser && data.member) {
-        targetUser = data.member;
+          setUser({
+            uid: fbUser.uid,
+            gymId: 'fit-fiber-gym',
+            displayName: fbUser.displayName || email.split('@')[0],
+            email: fbUser.email || email,
+            role,
+            membershipStatus: 'active',
+            currentStreak: 0,
+            longestStreak: 0,
+            totalQualifyingDays: 0,
+            totalVisits: 0,
+            pointsBalance: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+          localStorage.setItem('fitfiber_active_user', fbUser.uid);
+          setIsLoading(false);
+          return { success: true };
+        } catch (firebaseErr: unknown) {
+          const fbMsg = firebaseErr instanceof Error ? firebaseErr.message : 'Firebase Auth error';
+          console.warn('Real Firebase sign-in notice:', fbMsg);
+          // If user exists locally or fallback demo, continue to fallback
+        }
       }
 
+      // 2. Fallback to mock / seeded members
+      const targetUser = INITIAL_MEMBERS.find((m) => m.email.toLowerCase() === email.toLowerCase());
       if (targetUser) {
         setUser(targetUser);
         localStorage.setItem('fitfiber_active_user', targetUser.uid);
@@ -71,24 +179,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: true };
       }
 
-      // If user doesn't exist yet in demo mode, create an active member profile on the fly
-      const fallbackMember: GymMember = {
+      // 3. Create fresh member profile
+      const newMember: GymMember = {
         uid: `mem-${Date.now().toString(36)}`,
         gymId: 'fit-fiber-gym',
         displayName: email.split('@')[0],
         email,
-        role: email.includes('admin') ? 'admin' : 'member',
+        role: email.toLowerCase().includes('admin') || email === 'admin@fitgym.com' ? 'admin' : 'member',
         membershipStatus: 'active',
-        currentStreak: 1,
-        longestStreak: 1,
-        totalQualifyingDays: 1,
-        totalVisits: 1,
-        pointsBalance: 100,
+        currentStreak: 0,
+        longestStreak: 0,
+        totalQualifyingDays: 0,
+        totalVisits: 0,
+        pointsBalance: 0,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      setUser(fallbackMember);
-      localStorage.setItem('fitfiber_active_user', fallbackMember.uid);
+      setUser(newMember);
+      localStorage.setItem('fitfiber_active_user', newMember.uid);
       setIsLoading(false);
       return { success: true };
     } catch {
@@ -101,9 +209,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     displayName: string;
     email: string;
     phone?: string;
+    password?: string;
   }): Promise<{ success: boolean; message?: string }> => {
     setIsLoading(true);
     try {
+      // 1. Try creating real Firebase Auth user if configured
+      if (auth && data.password && isFirebaseConfigured) {
+        try {
+          const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+          if (auth.currentUser) {
+            await updateProfile(auth.currentUser, { displayName: data.displayName });
+          }
+          const fbUser = userCredential.user;
+          const role: UserRole =
+            data.email.toLowerCase().includes('admin') || data.email === 'admin@fitgym.com' ? 'admin' : 'member';
+
+          const newMember: GymMember = {
+            uid: fbUser.uid,
+            gymId: 'fit-fiber-gym',
+            displayName: data.displayName,
+            email: data.email,
+            phone: data.phone,
+            role,
+            membershipStatus: 'active',
+            currentStreak: 0,
+            longestStreak: 0,
+            totalQualifyingDays: 0,
+            totalVisits: 0,
+            pointsBalance: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          setUser(newMember);
+          localStorage.setItem('fitfiber_active_user', fbUser.uid);
+          setIsLoading(false);
+          return { success: true };
+        } catch (fbErr: unknown) {
+          const fbMsg = fbErr instanceof Error ? fbErr.message : 'Registration error';
+          console.warn('Real Firebase sign-up notice:', fbMsg);
+        }
+      }
+
+      // 2. Server API registration
       const res = await fetch('/api/admin/members', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -116,6 +264,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
         return { success: true };
       }
+
       setIsLoading(false);
       return { success: false, message: result.message || 'Registration failed' };
     } catch {
@@ -124,7 +273,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    if (auth) {
+      try {
+        await firebaseSignOut(auth);
+      } catch {
+        // ignore
+      }
+    }
     setUser(null);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('fitfiber_active_user');

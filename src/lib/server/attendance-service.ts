@@ -16,6 +16,7 @@ import {
   getMilestoneBonusAwardKey,
 } from '../engine/points';
 import { gymStore } from '../mock/store';
+import { adminDb, isAdminConfigured } from '../firebase/admin';
 
 export interface CheckInResult {
   success: boolean;
@@ -100,8 +101,11 @@ export class AttendanceService {
     gymId: string;
     memberId: string;
     coordinates?: Coordinates | null;
+    bypassLocationVerification?: boolean;
+    manualEntryReason?: string;
+    recordedByAdminId?: string;
   }): Promise<CheckInResult> {
-    const { gymId, memberId, coordinates } = params;
+    const { gymId, memberId, coordinates, bypassLocationVerification, manualEntryReason, recordedByAdminId } = params;
     const settings = await this.getSettings(gymId);
     if (!settings) {
       return { success: false, message: 'Invalid or unknown gym identifier.', errorCode: 'INVALID_GYM' };
@@ -129,10 +133,13 @@ export class AttendanceService {
       };
     }
 
-    // 3. Mandatory Location Verification
+    // 3. Location Verification (bypassed if manual staff entry with audit note)
     let locationVerified = false;
     let distanceMeters = 0;
-    if (settings.attendance.locationVerificationEnabled) {
+    if (bypassLocationVerification) {
+      locationVerified = true;
+      distanceMeters = 0;
+    } else if (settings.attendance.locationVerificationEnabled) {
       const gymCoords: Coordinates = {
         latitude: settings.attendance.latitude,
         longitude: settings.attendance.longitude,
@@ -256,6 +263,17 @@ export class AttendanceService {
     member.pointsBalance = currentBalance;
     member.updatedAt = nowIso;
 
+    // Asynchronously persist to Cloud Firestore if active
+    if (adminDb && isAdminConfigured) {
+      try {
+        const gymRef = adminDb.collection('gyms').doc(gymId);
+        gymRef.collection('attendance').doc(newSessionId).set(newSession).catch(() => {});
+        gymRef.collection('members').doc(member.uid).set(member, { merge: true }).catch(() => {});
+      } catch (e) {
+        console.warn('Firestore live sync notice:', e);
+      }
+    }
+
     let successMessage = `Welcome to FIT FIBER GYM! You are checked in.`;
     if (dailyPointsAward.pointsToAward > 0) {
       successMessage += ` Earned +${dailyPointsAward.pointsToAward} daily points!`;
@@ -263,6 +281,8 @@ export class AttendanceService {
     if (streakResult.milestoneUnlocked) {
       successMessage += ` 🎉 Milestone unlocked: ${streakResult.milestoneUnlocked.label} (+${streakResult.milestoneUnlocked.bonusPoints} bonus points)!`;
     }
+
+    gymStore.persist();
 
     return {
       success: true,
@@ -297,8 +317,29 @@ export class AttendanceService {
     activeSession.status = 'completed';
     activeSession.updatedAt = checkOutAt;
 
+    // Asynchronously persist to Cloud Firestore if active
+    if (adminDb && isAdminConfigured) {
+      try {
+        adminDb
+          .collection('gyms')
+          .doc(gymId)
+          .collection('attendance')
+          .doc(activeSession.id)
+          .update({
+            checkOutAt,
+            status: 'completed',
+            updatedAt: checkOutAt,
+          })
+          .catch(() => {});
+      } catch (e) {
+        console.warn('Firestore live checkOut sync notice:', e);
+      }
+    }
+
     const durationMs = new Date(checkOutAt).getTime() - new Date(activeSession.checkInAt).getTime();
     const durationMinutes = Math.max(1, Math.round(durationMs / (60 * 1000)));
+
+    gymStore.persist();
 
     return {
       success: true,
@@ -377,6 +418,7 @@ export class AttendanceService {
     };
 
     gymStore.redemptions.unshift(redemption);
+    gymStore.persist();
 
     return {
       success: true,

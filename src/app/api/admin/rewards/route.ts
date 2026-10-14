@@ -61,6 +61,8 @@ export async function POST(req: NextRequest) {
       timestamp: nowIso,
     });
 
+    gymStore.persist();
+
     return NextResponse.json({ success: true, reward: newReward });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal Server Error';
@@ -107,6 +109,8 @@ export async function PATCH(req: NextRequest) {
         timestamp: nowIso,
       });
 
+      gymStore.persist();
+
       return NextResponse.json({ success: true, redemption });
     }
 
@@ -121,6 +125,8 @@ export async function PATCH(req: NextRequest) {
       if (pointsCost !== undefined) reward.pointsCost = Number(pointsCost);
       if (stockLimit !== undefined) reward.stockLimit = Number(stockLimit);
       reward.updatedAt = nowIso;
+
+      gymStore.persist();
 
       return NextResponse.json({ success: true, reward });
     }

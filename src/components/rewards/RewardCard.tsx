@@ -5,6 +5,8 @@ import confetti from 'canvas-confetti';
 import { Award, Check, Loader2, Sparkles, AlertCircle } from 'lucide-react';
 import { Reward } from '@/lib/types';
 import { useAuth } from '@/lib/auth/context';
+import { sound } from '@/lib/client/audio';
+import RedemptionVoucherModal from './RedemptionVoucherModal';
 
 interface RewardCardProps {
   reward: Reward;
@@ -17,6 +19,8 @@ export default function RewardCard({ reward, userPoints, onRedeemed }: RewardCar
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [voucherModalOpen, setVoucherModalOpen] = useState(false);
+  const [voucherCode, setVoucherCode] = useState('');
 
   const canAfford = userPoints >= reward.pointsCost;
   const isOutOfStock = reward.stockLimit !== undefined && reward.redeemedCount >= reward.stockLimit;
@@ -47,11 +51,18 @@ export default function RewardCard({ reward, userPoints, onRedeemed }: RewardCar
       }
 
       setSuccessMessage(data.message);
+      const code = data.redemption?.id
+        ? `FFG-${data.redemption.id.toUpperCase()}`
+        : `FFG-${reward.name.split(' ')[0].toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      setVoucherCode(code);
+      setVoucherModalOpen(true);
+      sound.playRewardChime();
+
       try {
         confetti({
-          particleCount: 70,
-          spread: 50,
-          origin: { y: 0.7 },
+          particleCount: 80,
+          spread: 60,
+          origin: { y: 0.6 },
           colors: ['#10b981', '#fbbf24', '#ffffff'],
         });
       } catch {
@@ -158,6 +169,14 @@ export default function RewardCard({ reward, userPoints, onRedeemed }: RewardCar
           )}
         </div>
       </div>
+
+      <RedemptionVoucherModal
+        isOpen={voucherModalOpen}
+        onClose={() => setVoucherModalOpen(false)}
+        reward={reward}
+        voucherCode={voucherCode}
+        memberName={user?.displayName || 'Gym Member'}
+      />
     </div>
   );
 }

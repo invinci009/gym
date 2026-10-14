@@ -27,6 +27,59 @@ export async function GET(req: NextRequest) {
   }
 }
 
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { gymId = 'fit-fiber-gym', memberId, reason, adminId } = body;
+
+    if (!memberId) {
+      return NextResponse.json({ success: false, message: 'memberId is required.' }, { status: 400 });
+    }
+    if (!reason) {
+      return NextResponse.json(
+        { success: false, message: 'A mandatory administrative reason is required for manual staff check-in.' },
+        { status: 400 }
+      );
+    }
+
+    const { AttendanceService } = await import('@/lib/server/attendance-service');
+    const result = await AttendanceService.checkIn({
+      gymId,
+      memberId,
+      bypassLocationVerification: true,
+      manualEntryReason: reason,
+      recordedByAdminId: adminId || 'admin',
+    });
+
+    if (!result.success) {
+      return NextResponse.json(result, { status: 400 });
+    }
+
+    // Add audit log
+    gymStore.auditLogs.unshift({
+      id: `aud_${Date.now()}`,
+      gymId,
+      actorId: adminId || 'admin',
+      actorEmail: 'admin@fitfiber.com',
+      actorRole: 'admin',
+      action: 'attendance_manually_recorded',
+      targetType: 'attendance',
+      targetId: result.session?.id || 'manual',
+      details: {
+        memberId,
+        reason,
+        session: result.session,
+      },
+      timestamp: new Date().toISOString(),
+    });
+
+    return NextResponse.json(result, { status: 200 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Internal Server Error';
+    return NextResponse.json({ success: false, message }, { status: 500 });
+  }
+}
+
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
@@ -81,6 +134,8 @@ export async function PATCH(req: NextRequest) {
       },
       timestamp: nowIso,
     });
+
+    gymStore.persist();
 
     return NextResponse.json({ success: true, session });
   } catch (error: unknown) {

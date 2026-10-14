@@ -64,6 +64,8 @@ export async function PUT(req: NextRequest) {
       timestamp: new Date().toISOString(),
     });
 
+    gymStore.persist();
+
     return NextResponse.json({ success: true, settings: current });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal Server Error';

@@ -90,6 +90,8 @@ export async function POST(req: NextRequest) {
       timestamp: nowIso,
     });
 
+    gymStore.persist();
+
     return NextResponse.json({ success: true, member: newMember });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal Server Error';
@@ -115,6 +117,35 @@ export async function PATCH(req: NextRequest) {
     if (status) member.membershipStatus = status;
     if (membershipExpiresAt !== undefined) member.membershipExpiresAt = membershipExpiresAt;
     if (notes !== undefined) member.notes = notes;
+
+    const { pointsDelta } = body;
+    let pointsAdjustmentDetails: Record<string, unknown> | null = null;
+
+    if (typeof pointsDelta === 'number' && pointsDelta !== 0) {
+      const prevPoints = member.pointsBalance;
+      member.pointsBalance = Math.max(0, member.pointsBalance + pointsDelta);
+      const nowIso = new Date().toISOString();
+
+      gymStore.transactions.unshift({
+        id: `ptx_adj_${Date.now()}`,
+        gymId: 'fit-fiber-gym',
+        memberId: member.uid,
+        type: 'adjustment',
+        points: pointsDelta,
+        balanceAfter: member.pointsBalance,
+        reason: reason || (pointsDelta > 0 ? 'Administrative bonus points grant' : 'Administrative points deduction'),
+        idempotencyKey: `adj_${member.uid}_${Date.now()}`,
+        ruleVersion: 1,
+        createdAt: nowIso,
+      });
+
+      pointsAdjustmentDetails = {
+        previousPoints: prevPoints,
+        newPoints: member.pointsBalance,
+        pointsDelta,
+      };
+    }
+
     member.updatedAt = new Date().toISOString();
 
     // Audit log
@@ -124,16 +155,19 @@ export async function PATCH(req: NextRequest) {
       actorId: adminId || 'admin',
       actorEmail: 'admin@fitfiber.com',
       actorRole: 'admin',
-      action: 'member_updated',
+      action: typeof pointsDelta === 'number' ? 'points_manually_adjusted' : 'member_updated',
       targetType: 'member',
       targetId: memberId,
       details: {
         previousStatus,
         newStatus: member.membershipStatus,
         reason: reason || 'Administrative profile modification',
+        ...(pointsAdjustmentDetails || {}),
       },
       timestamp: new Date().toISOString(),
     });
+
+    gymStore.persist();
 
     return NextResponse.json({ success: true, member });
   } catch (error: unknown) {

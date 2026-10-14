@@ -24,6 +24,7 @@
 .DS_Store
 *.pem
 service-account*.json
+.data/
 
 # debug
 npm-debug.log*

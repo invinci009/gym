@@ -109,12 +109,12 @@ export default function LoginPage() {
           <div className="space-y-1.5">
             <button
               type="button"
-              onClick={() => handleQuickLogin('admin@fitfiber.com', 'admin')}
+              onClick={() => handleQuickLogin('admin@fitgym.com', 'admin')}
               className="w-full text-left p-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-xs flex items-center justify-between text-amber-200 transition-colors"
             >
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-amber-400" />
-                <span className="font-bold">Coach Aman (Gym Owner / Admin)</span>
+                <span className="font-bold">Coach Aman (admin@fitgym.com)</span>
               </div>
               <span className="text-[10px] bg-amber-500/30 px-2 py-0.5 rounded text-amber-300 font-semibold">
                 Admin Panel →

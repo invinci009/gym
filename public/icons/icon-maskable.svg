@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGradMask" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="50%" stop-color="#020617" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+    <linearGradient id="goldGradMask" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="50%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+    <filter id="shadowMask" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000000" flood-opacity="0.45" />
+    </filter>
+  </defs>
+
+  <!-- Full background bleed for maskable cropping -->
+  <rect width="512" height="512" fill="url(#bgGradMask)" />
+
+  <!-- Inner Safe Zone Content (Scaled to 76% to prevent edge clipping) -->
+  <g transform="translate(61.44, 61.44) scale(0.76)" filter="url(#shadowMask)">
+    <!-- QR Corner Targets -->
+    <rect x="110" y="110" width="84" height="84" rx="20" fill="none" stroke="url(#goldGradMask)" stroke-width="14" />
+    <rect x="133" y="133" width="38" height="38" rx="8" fill="url(#goldGradMask)" />
+
+    <rect x="318" y="110" width="84" height="84" rx="20" fill="none" stroke="url(#goldGradMask)" stroke-width="14" />
+    <rect x="341" y="133" width="38" height="38" rx="8" fill="url(#goldGradMask)" />
+
+    <rect x="110" y="318" width="84" height="84" rx="20" fill="none" stroke="url(#goldGradMask)" stroke-width="14" />
+    <rect x="133" y="341" width="38" height="38" rx="8" fill="url(#goldGradMask)" />
+
+    <!-- Center Pulse & Star Motif -->
+    <circle cx="256" cy="256" r="62" fill="url(#goldGradMask)" />
+    <path d="M 256,215 L 268,243 L 298,245 L 275,265 L 282,295 L 256,279 L 230,295 L 237,265 L 214,245 L 244,243 Z" fill="#0f172a" />
+
+    <!-- Dynamic Signal / Wave Arc -->
+    <path d="M 326 270 Q 360 290 350 336" fill="none" stroke="url(#goldGradMask)" stroke-width="12" stroke-linecap="round" />
+    <circle cx="360" cy="380" r="16" fill="url(#goldGradMask)" />
+    <circle cx="295" cy="370" r="12" fill="url(#goldGradMask)" />
+    <circle cx="390" cy="300" r="8" fill="url(#goldGradMask)" />
+  </g>
+</svg>
