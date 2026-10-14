@@ -25,7 +25,7 @@ export default function MobileBottomNav({ onOpenDrawer }: MobileBottomNavProps) 
   const { user, role } = useAuth();
   const isAdmin = role === 'admin';
 
-  if (pathname === '/login' || pathname === '/register' || pathname.startsWith('/check-in') || pathname === '/admin/qr/poster') {
+  if (pathname === '/login' || pathname === '/register') {
     return null;
   }
 
