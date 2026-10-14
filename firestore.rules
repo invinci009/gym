@@ -1,0 +1,94 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isMember(gymId, memberId) {
+      return isAuthenticated() && request.auth.uid == memberId;
+    }
+
+    function isAdmin(gymId) {
+      return isAuthenticated() && (
+        request.auth.token.role == 'admin' ||
+        get(/databases/$(database)/documents/gyms/$(gymId)/admins/$(request.auth.uid)).data != null
+      );
+    }
+
+    // Default posture: DENY ALL
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Gym Configuration & Settings
+    match /gyms/{gymId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin(gymId);
+
+      match /settings/{settingId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin(gymId);
+      }
+
+      // Member Profiles
+      match /members/{memberId} {
+        // Members can only read their own profile; admins can read all
+        allow read: if isMember(gymId, memberId) || isAdmin(gymId);
+        // Only trusted backend or admins can update status, balance, and streaks
+        allow create, update: if isAdmin(gymId);
+        allow delete: if isAdmin(gymId);
+      }
+
+      // Attendance Sessions (Server-Controlled State Machine)
+      match /attendance/{attendanceId} {
+        // Members can read their own attendance records
+        allow read: if isAuthenticated() && (
+          resource.data.memberId == request.auth.uid || isAdmin(gymId)
+        );
+        // Direct client writes are FORBIDDEN: check-in & check-out must go through Cloud Functions
+        allow create, update, delete: if false;
+      }
+
+      // Daily Attendance Dedup Documents (memberId_YYYYMMDD)
+      match /dailyAttendance/{dailyId} {
+        allow read: if isAuthenticated();
+        allow write: if false; // Only Cloud Functions Admin SDK can write
+      }
+
+      // Points Ledger (Immutable Transactions)
+      match /pointTransactions/{transactionId} {
+        allow read: if isAuthenticated() && (
+          resource.data.memberId == request.auth.uid || isAdmin(gymId)
+        );
+        // Immutable ledger: NO client updates or deletions permitted!
+        allow create, update, delete: if false;
+      }
+
+      // Rewards Catalogue
+      match /rewards/{rewardId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin(gymId);
+      }
+
+      // Reward Redemptions
+      match /redemptions/{redemptionId} {
+        allow read: if isAuthenticated() && (
+          resource.data.memberId == request.auth.uid || isAdmin(gymId)
+        );
+        // Direct creation requires backend balance deduction; only admin can update status to fulfilled
+        allow create: if false;
+        allow update: if isAdmin(gymId);
+        allow delete: if false;
+      }
+
+      // Audit Logs
+      match /auditLogs/{logId} {
+        allow read: if isAdmin(gymId);
+        allow write: if false; // Append-only by server
+      }
+    }
+  }
+}
